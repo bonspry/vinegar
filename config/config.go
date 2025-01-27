@@ -12,11 +12,13 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/apprehensions/rbxbin"
 	"github.com/apprehensions/wine"
+	"github.com/vinegarhq/vinegar/internal/dirs"
 	"github.com/vinegarhq/vinegar/sysinfo"
 )
 
-// Config is a representation of a Roblox binary Vinegar configuration.
-type Binary struct {
+// Studio is a representation of the deployment and behavior
+// of Roblox Studio.
+type Studio struct {
 	Channel       string        `toml:"channel"`
 	Launcher      string        `toml:"launcher"`
 	Renderer      string        `toml:"renderer"`
@@ -34,7 +36,7 @@ type Binary struct {
 // Config is a representation of the Vinegar configuration.
 type Config struct {
 	SanitizeEnv bool        `toml:"sanitize_env"`
-	Studio      Binary      `toml:"studio"`
+	Studio      Studio      `toml:"studio"`
 	Env         Environment `toml:"env"`
 }
 
@@ -52,14 +54,14 @@ var (
 //
 // Load is required for any initialization for Config, as it calls routines
 // to setup certain variables and verifies the configuration.
-func Load(name string) (Config, error) {
+func Load() (Config, error) {
 	cfg := Default()
 
-	if _, err := os.Stat(name); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(dirs.ConfigPath); errors.Is(err, os.ErrNotExist) {
 		return cfg, nil
 	}
 
-	if _, err := toml.DecodeFile(name, &cfg); err != nil {
+	if _, err := toml.DecodeFile(dirs.ConfigPath, &cfg); err != nil {
 		return cfg, err
 	}
 
@@ -80,38 +82,37 @@ func Default() Config {
 			"__GL_THREADED_OPTIMIZATIONS": "1",
 		},
 
-		Studio: Binary{
+		Studio: Studio{
 			Dxvk:        true,
-			DxvkVersion: "2.3",
+			DxvkVersion: "2.5.3",
 			GameMode:    true,
 			ForcedGpu:   "prime-discrete",
 			Renderer:    "D3D11",
-			Channel:     "", // Default upstream
+			Channel:     "LIVE",
 			DiscordRPC:  true,
-			// TODO: fill with studio fflag/env goodies
 			FFlags: make(rbxbin.FFlags),
 			Env:    make(Environment),
 		},
 	}
 }
 
-func (b *Binary) LauncherPath() (string, error) {
-	return exec.LookPath(strings.Fields(b.Launcher)[0])
+func (s *Studio) LauncherPath() (string, error) {
+	return exec.LookPath(strings.Fields(s.Launcher)[0])
 }
 
-func (b *Binary) validate() error {
-	if !strings.HasPrefix(b.Renderer, "D3D11") && b.Dxvk {
+func (s *Studio) validate() error {
+	if !strings.HasPrefix(s.Renderer, "D3D11") && s.Dxvk {
 		return ErrNeedDXVKRenderer
 	}
 
-	if b.Launcher != "" {
-		if _, err := b.LauncherPath(); err != nil {
+	if s.Launcher != "" {
+		if _, err := s.LauncherPath(); err != nil {
 			return fmt.Errorf("bad launcher: %w", err)
 		}
 	}
 
-	if b.WineRoot != "" {
-		pfx := wine.New("", b.WineRoot)
+	if s.WineRoot != "" {
+		pfx := wine.New("", s.WineRoot)
 		w := pfx.Wine("")
 		if w.Err != nil {
 			return fmt.Errorf("wineroot: %w", w.Err)
@@ -124,20 +125,20 @@ func (b *Binary) validate() error {
 	return nil
 }
 
-func (b *Binary) setup() error {
-	if err := b.validate(); err != nil {
+func (s *Studio) setup() error {
+	if err := s.validate(); err != nil {
 		return err
 	}
 
-	if err := b.FFlags.SetRenderer(b.Renderer); err != nil {
+	if err := s.FFlags.SetRenderer(s.Renderer); err != nil {
 		return err
 	}
 
-	if b.Channel == "LIVE" || b.Channel == "live" {
-		b.Channel = ""
+	if s.Channel == "LIVE" || s.Channel == "live" {
+		s.Channel = ""
 	}
 
-	return b.pickCard()
+	return s.pickCard()
 }
 
 func (c *Config) setup() error {

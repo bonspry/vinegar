@@ -16,11 +16,11 @@ var (
 	Logs      = filepath.Join(Cache, "logs")
 	Prefixes  = filepath.Join(Data, "prefixes")
 	Versions  = filepath.Join(Data, "versions")
+)
 
-	// Deprecated: Vinegar supports multiple wine prefixes
-	Prefix = filepath.Join(Data, "prefix")
-	// Deprecated: Vinegar supports multiple overlays for each Player and Studio
-	Overlay = filepath.Join(Config, "overlay")
+var (
+	StatePath  = filepath.Join(Data, "state.json")
+	ConfigPath = filepath.Join(Config, "config.toml")
 )
 
 func Mkdirs(dirs ...string) error {
